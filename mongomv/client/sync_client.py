@@ -1,6 +1,10 @@
-from typing import Any, Optional, List
-from pymongo import MongoClient
-from gridfs import GridFS
+from typing import Any, Optional, List, Union
+
+from bson import ObjectId
+
+
+from mongomv.services import PymongoService
+from mongomv.schemas import ModelEntity, ExperimentEntity
 
 
 class MongoMVClient:
@@ -12,31 +16,44 @@ class MongoMVClient:
 
 
     def __init__(self, mongo_uri: str, **kwargs: Any) -> None:
-        """Enter the mongo URI, also accept `MongoClient` args"""
-        self.client = MongoClient(mongo_uri, kwargs, timeoutMS=100)
+        """Enter the mongo URI, also accept `MongoClient` args.
+        Initialize MongoDB client.
+        Default arg for MongoClient: `timeoutMS` = 100.
         
-        assert len(self.client.list_databases()) != 0
-        
-        self.serialized_db = self.client.get_database(name=self.serialized_models_db)
-        self.fs = GridFS(self.serialized_db)
+        Example:
+        >>> from mongomv import MongoMVCLient 
+        >>> uri = "mongodb://root:secret@localhost:27017"
+        >>> client = MongoMVCLient(uri)
+        """
+        self.mongo_service = PymongoService(mongo_uri)
     
 
-    def create_experiment(self, name: str, tags: list):
-        pass
+    def create_experiment(self, name: str, tags: list) -> ExperimentEntity:
+        experiment = ExperimentEntity(name=name, tags=tags)
+        self.mongo_service.create(instance=experiment)
+        return experiment
+
 
     def create_model(self,
                      name: str,
                      tags: List[str],
                      params: Optional[List[dict]] = None,
-                     description: str = ""):
-        pass
+                     description: str = "") -> ModelEntity:
+        model = ModelEntity(
+            name=name,
+            tags=tags,
+            params=params,
+            description=description
+        )
+        self.mongo_service.create(instance=model)
+        return model
 
 
     def list_of_experiments(self):
         pass
 
 
-    def list_of_models(self, experiment_id: str):
+    def list_of_models(self, experiment_id: Union[str, ObjectId]):
         pass
 
 
