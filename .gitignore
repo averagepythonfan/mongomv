@@ -1,0 +1,8 @@
+pymongo.ipynb
+dist
+.ipynb_checkpoints
+/mongomv/__pycache__
+/mongomv/client/__pycache__
+/mongomv/core/__pycache__
+/mongomv/schemas/__pycache__
+/mongomv/services/__pycache__
