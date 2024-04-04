@@ -1,76 +1,55 @@
-from datetime import datetime
-from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union
+from typing import Any, List, Optional, Union
+from attrs import define, field, setters, Factory, validators
+from bson import ObjectId
 
-from pydantic import BaseModel, Field
-
-from .misc import ObjectId, object_id_as_str
-
-
-JSONObject = Dict[AnyStr, Any]
-JSONArray = List[Any]
-JSONStructure = Union[JSONArray, JSONObject]
+from mongomv.core import MetaEntity
 
 
-class MetaCollection(BaseModel):
-    class Collection:
-        name = None
+class ExperimentEntity(MetaEntity):
+    models: Optional[List[ObjectId]] = field(default=Factory(list))
+    @models.validator
+    def check(self, attribute, value):
+        for el in value:
+            if not isinstance(el, ObjectId):
+                raise ValueError()
+
+    def add_model(self, obj_id):
+        if not isinstance(obj_id, ObjectId):
+            raise TypeError("Model must be `ObjectId` type, not {t}".format(t=type(obj_id)))
+
+    def remove_model(self, obj_id):
+        pass
 
 
-class Experiments(MetaCollection):
-    """Experiments base model.
+@define
+class ModelParams:
+    parameter: str = field(kw_only=True, validator=validators.instance_of(str))
+    value: Any = field(kw_only=True)
 
-    Uses as instance for any repository.
-    For example:
-    >>> class SyncExperimentRepository(PymongoRepository):
-    ...     model = Experiments
-
-    Requires set `class Collcection` and property `name`.
-    Might be used in client section.
-    """
-
-    id: ObjectId = Field(default_factory=object_id_as_str, alias="_id")
-    name: Optional[str] = None
-    tags: Optional[List[str]] = None
-    date: datetime = datetime.now()
-    models: Optional[List[ObjectId]] = []
-
-    class Collection:
-        name = "experiments"
+@define
+class ModelMetrics:
+    metric: str = field(kw_only=True, validator=validators.instance_of(str))
+    value: Union[int, float, str] = field(kw_only=True)
 
 
-class ModelParams(BaseModel):
-    """Schema for Models."""
-    parameter: Optional[str] = None
-    value: Optional[Any] = None
+class ModelEntity(MetaEntity):
+    params: Optional[List[ModelParams]] = field(default=Factory(list))
+    @params.validator
+    def check(self, attribute, value):
+        for el in value:
+            if not isinstance(el, ModelParams):
+                raise ValueError("Model params must be `ModelParams` type, not {t}".format(t=type(value)))
+    metrics: Optional[List[ModelMetrics]] = field(default=Factory(list))
+    @metrics.validator
+    def check(self, attribute, value):
+        for el in value:
+            if not isinstance(el, ModelMetrics):
+                raise ValueError("Model params must be `ModelMetrics` type, not {t}".format(t=type(value)))
+    description: Optional[str] = field(default=Factory(''))
+    serialized_model_id: Optional[ObjectId] = field(on_setattr=setters.frozen, validator=validators.instance_of(ObjectId))
 
-class ModelMetrics(BaseModel):
-    """Schema for Models."""
-    metric: Optional[str] = None
-    value: Optional[Union[int, float, str]] = None
+    def dump_model(self, model):
+        pass
 
-
-class Models(MetaCollection):
-    """`Models` base model.
-
-    Uses as instance for any repository.
-    For example:
-    >>> class SyncExperimentRepository(PymongoRepository):
-    ...     model = Models
-
-    Requires set `class Collcection` and property `name`.
-    Might be used in client section.
-    """
-
-    id: ObjectId = Field(default_factory=object_id_as_str, alias="_id")
-    name: Optional[str] = None
-    params: Optional[List[ModelParams]] = None
-    tags: Optional[List[str]] = None
-    metrics: Optional[List[ModelMetrics]] = None
-    description: Optional[str] = None
-    date: datetime = datetime.now()
-    input_shape: Optional[Tuple[Any, Any]] = None
-    config: Optional[JSONStructure] = None
-    weights: Optional[JSONStructure] = None
-
-    class Collection:
-        name = "models"
+    def load_model(self):
+        pass

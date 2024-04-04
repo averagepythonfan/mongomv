@@ -37,7 +37,7 @@ class MongoMVClient:
     def create_model(self,
                      name: str,
                      tags: List[str],
-                     params: Optional[List[dict]] = None,
+                     params: Optional[List[dict]] = [],
                      description: str = "") -> ModelEntity:
         model = ModelEntity(
             name=name,
