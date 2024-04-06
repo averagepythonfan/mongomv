@@ -25,7 +25,6 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: secret
     ports:
       - "27017:27017"
-
 ```
 
 and then up mongodb container:
@@ -37,11 +36,11 @@ and then up mongodb container:
 
 ```Python
 >>> from mongoumv.client import MongoMVClient
->>> client = CorfuClient("mongodb://test:test@localhost:27017")
->>> exp = client.create_experiment(name="test_del", tags=["test", "delete"])
+>>> client = MongoMVClient("mongodb://root:secret@localhost:27017")
+>>> exp = client.create_experiment(name="test_exp", tags=["test", "dev"])
 >>> exp.id
 ... ObjectId('658432fe394f866bc0096605')
->>> md = client.create_model(name="test_md", tags=["test", "model"])
+>>> md = client.create_model(name="test_md", tags=["test", "v0.1"])
 >>> md.id
 ... ObjectId('6584339e394f866bc0096607')
 
