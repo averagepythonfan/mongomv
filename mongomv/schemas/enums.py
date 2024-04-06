@@ -1,6 +1,11 @@
 from enum import Enum
 
 
+class Collections(Enum):
+    experiments = "experiments"
+    models = "models"
+
+
 class Instance(Enum):
     experiment = "experiment"
     model = "model"

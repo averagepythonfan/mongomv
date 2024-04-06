@@ -1,55 +1,175 @@
-from typing import Any, List, Optional, Union
-from attrs import define, field, setters, Factory, validators
+from typing import Any, List, Optional, Type, TypeVar, Union
 from bson import ObjectId
+from pydantic import BaseModel, ConfigDict, Field
+# from mongomv.services import PymongoService
+from datetime import datetime
 
-from mongomv.core import MetaEntity
+from .enums import UpdateExperiment, UpdateModel, Collections, UpdateModelBase
+
+
+PymongoService = TypeVar("PymongoService")
+
+
+class MetaEntity(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    service: Optional[PymongoService] = Field(default=None, exclude=True, repr=False)
+    collection: Optional[Collections] = Field(default=None, exclude=True, repr=False)
+
+    id: Optional[ObjectId] = Field(default_factory=lambda: ObjectId(), frozen=True, alias="_id")
+    name: str
+    tags: list[str] = Field(default_factory=list)
+    date: datetime = Field(default_factory=datetime.now, frozen=True)
+
+    def add_tag(self, tags: list[str]):
+        for el in tags:
+            if not isinstance(el, str):
+                raise TypeError(f"Tags must be `list[str]`, not `list[{type(el)}]`")
+        self.tags.extend(tags)
+        if self.collection is Collections.experiments:
+            return self.service.update(
+                instance=self,
+                update=UpdateExperiment.add_tag,
+                value=tags
+            )
+        elif self.collection is Collections.models:
+            return self.service.update(
+                instance=self,
+                update=UpdateModelBase.add_tag,
+                value=tags
+            )
+
+
+    def remove_tag(self, tags: list[str]):
+        for el in tags:
+            if not isinstance(el, str):
+                raise TypeError(f"Tags must be `list[str]`, not `list[{type(el)}]`")
+        self.tags = list(set(self.tags) - set(tags))
+        if self.collection is Collections.experiments:
+            return self.service.update(
+                instance=self,
+                update=UpdateExperiment.remove_tag,
+                value=tags
+            )
+        elif self.collection is Collections.models:
+            return self.service.update(
+                instance=self,
+                update=UpdateModelBase.remove_tag,
+                value=tags
+            )
+
+
+    def rename(self, new_name: str):
+        assert type(new_name) == str, f"new name must be `str`, not {type(new_name)}"
+        self.name = new_name
+        if self.collection is Collections.experiments:
+            return self.service.update(
+                instance=self,
+                update=UpdateExperiment.rename,
+                value=new_name
+            )
+        elif self.collection is Collections.models:
+            return self.service.update(
+                instance=self,
+                update=UpdateModelBase.rename,
+                value=new_name
+            )
+
+
+    def delete(self):
+        return self.service.delete(instance=self)
+        
+
+    def to_dict(self):
+        return self.model_dump(exclude_none=True, by_alias=True)
 
 
 class ExperimentEntity(MetaEntity):
-    models: Optional[List[ObjectId]] = field(default=Factory(list))
-    @models.validator
-    def check(self, attribute, value):
-        for el in value:
-            if not isinstance(el, ObjectId):
-                raise ValueError()
+    collection: Collections = Field(default=Collections.experiments, exclude=True, repr=False)
 
-    def add_model(self, obj_id):
-        if not isinstance(obj_id, ObjectId):
-            raise TypeError("Model must be `ObjectId` type, not {t}".format(t=type(obj_id)))
+    models: Optional[List[ObjectId]] = Field(default_factory=list)
 
-    def remove_model(self, obj_id):
-        pass
+    def add_model(self, model: ObjectId):
+        return self.service.update(
+            instance=self,
+            update=UpdateExperiment.add_model,
+            value=model
+        )
 
 
-@define
-class ModelParams:
-    parameter: str = field(kw_only=True, validator=validators.instance_of(str))
-    value: Any = field(kw_only=True)
+    def remove_model(self, model: ObjectId):
+        return self.service.update(
+            instance=self,
+            update=UpdateExperiment.remove_model,
+            value=model
+        )
 
-@define
-class ModelMetrics:
-    metric: str = field(kw_only=True, validator=validators.instance_of(str))
-    value: Union[int, float, str] = field(kw_only=True)
+
+class ModelParams(BaseModel):
+    parameter: str = Field(frozen=True)
+    value: Any
+
+class ModelMetrics(BaseModel):
+    metric: str = Field(frozen=True)
+    value: Any
 
 
 class ModelEntity(MetaEntity):
-    params: Optional[List[ModelParams]] = field(default=Factory(list))
-    @params.validator
-    def check(self, attribute, value):
-        for el in value:
-            if not isinstance(el, ModelParams):
-                raise ValueError("Model params must be `ModelParams` type, not {t}".format(t=type(value)))
-    metrics: Optional[List[ModelMetrics]] = field(default=Factory(list))
-    @metrics.validator
-    def check(self, attribute, value):
-        for el in value:
-            if not isinstance(el, ModelMetrics):
-                raise ValueError("Model params must be `ModelMetrics` type, not {t}".format(t=type(value)))
-    description: Optional[str] = field(default=Factory(''))
-    serialized_model_id: Optional[ObjectId] = field(on_setattr=setters.frozen, validator=validators.instance_of(ObjectId))
+    collection: Collections = Field(default=Collections.models, exclude=True, repr=False)
 
-    def dump_model(self, model):
+    params: Optional[List[ModelParams]] = Field(default_factory=list)
+    metrics: Optional[List[ModelMetrics]] = Field(default_factory=list)
+    description: Optional[str] = None
+    serialized_model: Optional[ObjectId] = None
+
+    def add_param(self, params: ModelParams):
+        assert type(params) == ModelParams, "params must be `ModelParams` type"
+        return self.service.update(
+            instance=self,
+            update=UpdateModel.add_params,
+            value=params
+        )
+
+    def remove_param(self, params: str):
+        return self.service.update(
+            instance=self,
+            update=UpdateModel.remove_params,
+            value=params
+        )
+
+    def add_metric(self, metrics: ModelMetrics):
+        assert type(metrics) == ModelParams, "metrics must be `ModelMetrics` type"
+        return self.service.update(
+            instance=self,
+            update=UpdateModel.add_metric,
+            value=metrics
+        )
+
+    def remove_metric(self, metrics: ModelMetrics):
+        return self.service.update(
+            instance=self,
+            update=UpdateModel.remove_metric,
+            value=metrics
+        )
+
+
+    def set_description(self, description: str):
+        return self.service.update(
+            instance=self,
+            update=UpdateModelBase.set_description,
+            value=description
+        )
+
+
+    def dump_model(self):
+        """GridFS"""
         pass
 
-    def load_model(self):
+    def load_model(self, path: str):
+        """GridFS"""
         pass
+
+    def summary(self):
+        print(f"Model name:................ {self.name}")
+        print(f"Model tags:................ {self.tags}")
+        print(f"Model description:......... {self.description}")
+        print(f"Model creation date: ...... {self.date}")
