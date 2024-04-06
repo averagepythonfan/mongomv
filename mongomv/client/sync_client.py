@@ -1,10 +1,8 @@
 from typing import Any, Optional, List, Union
 
-from bson import ObjectId
-
-
+# from mongomv.services import PymongoService
+from mongomv.schemas import ModelEntity, ExperimentEntity, ModelParams
 from mongomv.services import PymongoService
-from mongomv.schemas import ModelEntity, ExperimentEntity
 
 
 class MongoMVClient:
@@ -29,7 +27,15 @@ class MongoMVClient:
     
 
     def create_experiment(self, name: str, tags: list) -> ExperimentEntity:
-        experiment = ExperimentEntity(name=name, tags=tags)
+        """Create an experiment instance.
+        
+        Requires name and tags. Return `ExperimentEntity` (mongomv.schemas.ExperimentEntity) instance.
+        Example:
+        >>> exp = client.create_experiment(name="keras_cv", tags=["dev", "v0.1"])
+        >>> exp.id
+        ... ObjectId('66105f81426f32b0c3d7e42f')
+        """
+        experiment = ExperimentEntity(name=name, tags=tags, service=self.mongo_service)
         self.mongo_service.create(instance=experiment)
         return experiment
 
@@ -37,25 +43,27 @@ class MongoMVClient:
     def create_model(self,
                      name: str,
                      tags: List[str],
-                     params: Optional[List[dict]] = [],
-                     description: str = "") -> ModelEntity:
+                     params: Optional[List[ModelParams]] = [],
+                     description: str = None) -> ModelEntity:
         model = ModelEntity(
             name=name,
             tags=tags,
             params=params,
-            description=description
+            description=description,
+            service=self.mongo_service
         )
         self.mongo_service.create(instance=model)
         return model
 
 
-    def list_of_experiments(self):
-        pass
+    def list_of_experiments(self, num: int = 10, page: int = 0):
+        cur = self.mongo_service.client.mongomv.experiments.find({})
+        return list(cur)[num*page:num*(page+1)]
 
 
-    def list_of_models(self, experiment_id: Union[str, ObjectId]):
-        pass
-
+    def list_of_models(self, num: int = 10, page: int = 0):
+        cur = self.mongo_service.client.mongomv.models.find({})
+        return list(cur)[num*page:num*(page+1)]
 
 
     def find_experiment_by(self):
