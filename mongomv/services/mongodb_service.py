@@ -3,7 +3,6 @@ from datetime import datetime
 from bson import ObjectId
 from pymongo import MongoClient, CursorType
 from pymongo.results import UpdateResult
-from pytest import param
 
 from mongomv.schemas import (
     ModelEntity,
@@ -22,6 +21,9 @@ Instance = Union[ModelEntity, ExperimentEntity]
 
 
 class PymongoService:
+    """PyMongo CRUD service.
+    
+    Requires a mongodb uri."""
 
     serialized_models_db_name = "serialized"
     mongomv_db_name = "mongomv"
@@ -54,6 +56,7 @@ class PymongoService:
 
 
     def create(self, instance: Instance) -> None:
+        """Create an instance of model or experiment."""
         if isinstance(instance, ModelEntity):
             self.models.insert_one(instance.to_dict())
         elif isinstance(instance, ExperimentEntity):
@@ -121,7 +124,7 @@ class PymongoService:
             )
 
 
-    def delete(self, instance: Instance):
+    def delete(self, instance: Instance) -> str:
         f = {"_id": instance.id}
         if isinstance(instance, ExperimentEntity):
             result = self.experiments.delete_one(filter=f)
