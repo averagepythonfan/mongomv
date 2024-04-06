@@ -75,7 +75,7 @@ class MetaEntity(BaseModel):
             )
 
 
-    def delete(self):
+    def delete(self) -> bool:
         return self.service.delete(instance=self)
         
 

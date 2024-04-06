@@ -8,7 +8,7 @@ def query(find_by: FindBy, value: Union[str, datetime.datetime, List[str]]):
     if find_by is FindBy.name:
         return {"name": value }
     elif find_by is FindBy.tags:
-        return {"tags": {"$in": [value]}}
+        return {"tags": {"$in": value}}
     elif find_by is FindBy.date:
         return {"date": {"$lt": datetime.datetime.fromisoformat(value)}}
     elif find_by is FindBy.id:

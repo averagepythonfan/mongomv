@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Optional, Union, List
 from datetime import datetime
 from bson import ObjectId
 from pymongo import MongoClient, CursorType
@@ -12,6 +12,7 @@ from mongomv.schemas import (
     UpdateModel,
     ModelParams,
     ModelMetrics,
+    Collections
 )
 
 from .misc import query, update_query
@@ -39,6 +40,7 @@ class PymongoService:
         self.models = self.mongomv.get_collection(name=self.models_collections_name)
 
 
+    @staticmethod
     def _validate_cursor(cur: CursorType, is_list: bool = False) -> Union[list, str]:
         """Validation function for `read` pymongo crud service method"""
         listed = list(cur)
@@ -66,7 +68,7 @@ class PymongoService:
 
 
     def read(self,
-             instance: Instance,
+             collection: Collections,
              find_by: FindBy,
              value: Union[str, datetime, List[str]] = None,
              is_list: bool = False) -> List[Union[ExperimentEntity, ModelEntity]]:
@@ -76,24 +78,24 @@ class PymongoService:
         }
         q = query(**params)
 
-        if isinstance(instance, ExperimentEntity):
+        if collection is Collections.experiments:
             cur = self.experiments.find(filter=q)
             validated: list | str = self._validate_cursor(cur=cur, is_list=is_list)
             return [ExperimentEntity(**el) for el in validated]
-        elif isinstance(instance, ModelEntity):
+        elif collection is Collections.models:
             cur = self.models.find(filter=q)
             validated: list | str = self._validate_cursor(cur=cur, is_list=is_list)
             return [ModelEntity(**el) for el in validated]
         else:
             raise ValueError(
-                "Instance must be `ExperimentEntity` or `ModelEntity`, not {t}".format(t=type(instance))
+                "Instance must be enum's `Collections`, not {t}".format(t=type(collection))
             )
     
 
     def update(self,
                instance: Instance,
                update: Union[UpdateExperiment, UpdateModel],
-               value: Union[str, ModelParams, ModelMetrics, ObjectId]):
+               value: Union[str, ModelParams, ModelMetrics, ObjectId]) -> Optional[str]:
         if isinstance(instance, ExperimentEntity):
             if update is UpdateExperiment.add_model:
                 cur = self.models.find(filter={"_id": value})
@@ -124,18 +126,18 @@ class PymongoService:
             )
 
 
-    def delete(self, instance: Instance) -> str:
+    def delete(self, instance: Instance) -> Optional[bool]:
         f = {"_id": instance.id}
         if isinstance(instance, ExperimentEntity):
             result = self.experiments.delete_one(filter=f)
             if result.deleted_count == 1:
-                return f"experiment deleted, id: {instance.id}"
+                return True
             else:
                 raise KeyError(f"experiment did not deleted, id: {instance.id}")
         elif isinstance(instance, ModelEntity):
             result = self.models.delete_one(filter=f)
             # delete serialized model
             if result.deleted_count == 1:
-                return f"model deleted, id: {instance.id}"
+                return True
             else:
                 raise KeyError(f"model did not deleted, id: {instance.id}")
