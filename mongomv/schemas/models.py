@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, List, Optional, TypeVar
 from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
@@ -129,6 +130,7 @@ class ModelEntity(MetaEntity):
     metrics: Optional[List[ModelMetrics]] = Field(default_factory=list)
     description: Optional[str] = None
     serialized_model: Optional[ObjectId] = None
+    model_path: Optional[Path] = None
 
     def add_param(self, params: ModelParams):
         assert type(params) == ModelParams, "params must be `ModelParams` type"

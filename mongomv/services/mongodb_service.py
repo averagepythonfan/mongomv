@@ -69,7 +69,7 @@ class PymongoService:
         if model_path:
             model_path = Path(model_path) if isinstance(model_path, str) else model_path
         else:
-            model_path = Path(os.getcwd()).joinpath(f"/tmp/{cur.filename}")
+            model_path = Path(os.getcwd()).joinpath(f"tmp/{cur.filename}")
         if model_path.exists():
             raise FileExistsError("File exists")
 
