@@ -1,14 +1,9 @@
 from bson import ObjectId
 import pytest
+from pydantic import ValidationError
 from mongomv import MongoMVClient
+from contextlib import nullcontext as does_not_raise
 from mongomv.schemas import ExperimentEntity, ModelEntity, ModelParams
-from tests.conftest import TEST_MONGO_URI
-
-
-@pytest.fixture(scope="module")
-def mongomv_client():
-    cl = MongoMVClient(mongo_uri=TEST_MONGO_URI)
-    yield cl
 
 
 @pytest.mark.usefixtures("mongomv_client")
@@ -16,18 +11,21 @@ class TestMongoMVClient:
 
 
     @pytest.mark.parametrize(
-        argnames="name, tags",
+        argnames="name, tags, expectation",
         argvalues=[
-            ("first_try", ["v0.1.1", "alpha"]),
-            ("sec_try", ["v0.2.3", "beta", "temporary"]),
-            ("last_try", ["v0.5.2", "rc"]),
+            ("first_try", ["v0.1.1", "alpha"], does_not_raise()),
+            ("sec_try", ["v0.2.3", "beta", "temporary"], does_not_raise()),
+            ("last_try", ["v0.5.2", "rc"], does_not_raise()),
+            (12345, ["raise", "exception"], pytest.raises(ValidationError)),
+            ("validation_error", [1, 45, 3], pytest.raises(ValidationError)),
         ]
     )
-    def test_create_experiment(self, name, tags, mongomv_client: MongoMVClient):
-        exp = mongomv_client.create_experiment(name=name, tags=tags)
-        assert isinstance(exp, ExperimentEntity)
-        assert exp.tags == tags
-        assert exp.name == name
+    def test_create_experiment(self, name, tags, expectation, mongomv_client: MongoMVClient):
+        with expectation:
+            exp = mongomv_client.create_experiment(name=name, tags=tags)
+            assert isinstance(exp, ExperimentEntity)
+            assert exp.tags == tags
+            assert exp.name == name
 
 
     @pytest.mark.parametrize(
@@ -43,25 +41,29 @@ class TestMongoMVClient:
 
 
     @pytest.mark.parametrize(
-        argnames="name, tags, params, description",
+        argnames="name, tags, params, description, expectation",
         argvalues=[
-            ("first_md", ["test1"], [ModelParams(parameter="seed", value=41)], "first model description"),
-            ("keras_md", ["test2"], [ModelParams(parameter="seed", value=42)], "keras model description"),
-            ("tf_md", ["test3"], [ModelParams(parameter="batch", value=50)], "tensorflow model description"),
+            ("first_md", ["test1"], [ModelParams(parameter="seed", value=41)], "first model description", does_not_raise()),
+            ("keras_md", ["test2"], [ModelParams(parameter="seed", value=42)], "keras model description", does_not_raise()),
+            ("tf_md", ["test3"], [ModelParams(parameter="batch", value=50)], "tensorflow model description", does_not_raise()),
+            (12234, ["test2"], [ModelParams(parameter="seed", value=42)], "keras model description", pytest.raises(ValidationError)),
+            ("val_error", [23, 4, 2], [ModelParams(parameter="seed", value=42)], "keras model description", pytest.raises(ValidationError)),
+            ("val_error", ["test6"], [ModelParams(parameter="seed", value=43)], 2345, pytest.raises(ValidationError)),
         ]
     )
-    def test_create_model(self, name, tags, params, description, mongomv_client: MongoMVClient):
-        md = mongomv_client.create_model(
-            name=name,
-            tags=tags,
-            params=params,
-            description=description
-        )
-        assert isinstance(md, ModelEntity)
-        assert md.name == name
-        assert md.tags == tags
-        assert md.params == params
-        assert md.description == description
+    def test_create_model(self, name, tags, params, description, expectation, mongomv_client: MongoMVClient):
+        with expectation:
+            md = mongomv_client.create_model(
+                name=name,
+                tags=tags,
+                params=params,
+                description=description
+            )
+            assert isinstance(md, ModelEntity)
+            assert md.name == name
+            assert md.tags == tags
+            assert md.params == params
+            assert md.description == description
 
 
     @pytest.mark.parametrize(
