@@ -20,6 +20,7 @@ def model():
     md.delete()
 
 
+@pytest.mark.usefixtures("mongomv_client")
 class TestExperimentEntity:
 
     @pytest.mark.parametrize(
@@ -30,7 +31,8 @@ class TestExperimentEntity:
             ("TestExperiment"),
         ]
     )
-    def test_rename_experiment(self, new_name, experiment: ExperimentEntity):
+    def test_rename_experiment(self, new_name, experiment: ExperimentEntity, mongomv_client: MongoMVClient):
         result = experiment.rename(new_name=new_name)
         assert type(result) == str
-        
+        exp = mongomv_client.find_experiment_by(find_by="name", value=new_name)
+        assert exp.name == new_name
