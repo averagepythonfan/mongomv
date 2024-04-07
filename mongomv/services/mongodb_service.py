@@ -1,8 +1,12 @@
+import os
+from pathlib import Path
+from types import NoneType
 from typing import Optional, Union, List
 from datetime import datetime
 from bson import ObjectId
 from pymongo import MongoClient, CursorType
 from pymongo.results import UpdateResult
+from gridfs import GridFS
 
 from mongomv.schemas import (
     ModelEntity,
@@ -34,10 +38,44 @@ class PymongoService:
     def __init__(self, uri: Union[str, bytes] = None, timeoutMS: int = 100) -> None:
         self.client = MongoClient(uri, timeoutMS=timeoutMS)
         self.mongomv = self.client.get_database(name=self.mongomv_db_name)
-        self.serialized_models = self.client.get_database(name=self.serialized_models_db_name) 
+        self.serialized_models = self.client.get_database(name=self.serialized_models_db_name)
+        self.fs = GridFS(database=self.serialized_models, collection="models")
 
         self.experiments = self.mongomv.get_collection(name=self.experiments_collection_name)
         self.models = self.mongomv.get_collection(name=self.models_collections_name)
+
+
+    def dump(self, model_path: Path | str, filename: str) -> ObjectId:
+        """Dumps model to MongoDB with GridFS.
+        
+        Return `ObjectId` of file.
+        """
+        model_path = Path(model_path) if isinstance(model_path, str) else model_path
+        if model_path.exists():
+            with open(file=model_path, mode="rb") as md:
+                if md.readable():
+                    data = md.read()
+                    return self.fs.put(data=data, filename=filename)
+                else:
+                    raise TypeError("File not readable")
+        else:
+            raise FileNotFoundError("File does not exists")
+
+
+    def load(self, model_object_id: ObjectId, model_path: str | Path = None) -> bool:
+        cur = self.fs.find_one({"_id": model_object_id})
+        assert type(cur) not in (None, NoneType), "Serialized model not found"
+
+        if model_path:
+            model_path = Path(model_path) if isinstance(model_path, str) else model_path
+        else:
+            model_path = Path(os.getcwd()).joinpath(f"/tmp/{cur.filename}")
+        if model_path.exists():
+            raise FileExistsError("File exists")
+
+        with open(model_path, "wb") as md:
+            md.write(cur.read())
+        return True
 
 
     @staticmethod

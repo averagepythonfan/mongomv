@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Type, TypeVar, Union
+from typing import Any, List, Optional, TypeVar
 from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
 # from mongomv.services import PymongoService
@@ -89,24 +89,33 @@ class ExperimentEntity(MetaEntity):
     models: Optional[List[ObjectId]] = Field(default_factory=list)
 
     def add_model(self, model: ObjectId):
-        return self.service.update(
+        assert isinstance(model, ObjectId)
+        
+        result = self.service.update(
             instance=self,
             update=UpdateExperiment.add_model,
             value=model
         )
+        self.models.append(model)
+        return result
 
 
     def remove_model(self, model: ObjectId):
-        return self.service.update(
+        assert isinstance(model, ObjectId)
+        result = self.service.update(
             instance=self,
             update=UpdateExperiment.remove_model,
             value=model
         )
+        index = self.models.index(model)
+        self.models.pop(index)
+        return result
 
 
 class ModelParams(BaseModel):
     parameter: str = Field(frozen=True)
     value: Any
+
 
 class ModelMetrics(BaseModel):
     metric: str = Field(frozen=True)
@@ -123,50 +132,95 @@ class ModelEntity(MetaEntity):
 
     def add_param(self, params: ModelParams):
         assert type(params) == ModelParams, "params must be `ModelParams` type"
-        return self.service.update(
+
+        result=  self.service.update(
             instance=self,
             update=UpdateModel.add_params,
             value=params
         )
+        self.params.append(params)
+        return result
 
-    def remove_param(self, params: str):
-        return self.service.update(
+
+    def remove_param(self, params: ModelParams):
+        result = self.service.update(
             instance=self,
             update=UpdateModel.remove_params,
             value=params
         )
+        index = self.params.index(params)
+        self.params.pop(index)
+        return result
+
 
     def add_metric(self, metrics: ModelMetrics):
         assert type(metrics) == ModelParams, "metrics must be `ModelMetrics` type"
-        return self.service.update(
+        result = self.service.update(
             instance=self,
             update=UpdateModel.add_metric,
             value=metrics
         )
+        self.metrics.append(metrics)
+        return result
+
 
     def remove_metric(self, metrics: ModelMetrics):
-        return self.service.update(
+        result = self.service.update(
             instance=self,
             update=UpdateModel.remove_metric,
             value=metrics
         )
+        ind = self.metrics.index(metrics)
+        self.metrics.pop(ind)
+        return result
 
 
     def set_description(self, description: str):
-        return self.service.update(
+        result = self.service.update(
             instance=self,
             update=UpdateModelBase.set_description,
             value=description
         )
+        self.description = description
+        return result
 
 
-    def dump_model(self):
-        """GridFS"""
-        pass
+    def dump_model(self, model_path, filename) -> str:
+        """Dump model to MongoDB file storage using GridFS.
+        
+        Requires serialized model path and filename.
+        Return `str`: "Model successfully serialized"
 
-    def load_model(self, path: str):
-        """GridFS"""
-        pass
+        :param:
+            - model_path: might be `Path` or `str` type
+            - filename: str
+
+        Keras example:
+        >>> filename = "cv_v01.keras"
+        >>> path = f"/tmp/{filename}"
+        >>> model.save(path)
+        >>> from mongomv import MongoMVClient
+        >>> client = MongoMVClient(mongo_uri)
+        >>> md = client.create_model(name="keras", tags=["dev", "testing"])
+        >>> md.dump_model(model_path=path, filename=filename)
+        ... "Model successfully serialized"
+        """
+        self.serialized_model = self.service.dump(model_path, filename)
+        return "Model successfully serialized"
+
+
+    def load_model(self, model_path: str = None):
+        """Load model from MongoDB file storage using GridFS.
+        
+        Requires serialized model id (look `dump_model`)
+        and model. If model path not set, then default path is `cwd/tmp/filename`.
+        """
+        if self.serialized_model is None:
+            raise KeyError("There is no serialized model")
+
+        if self.service.load(self.serialized_model, model_path):
+            return "Model successfully loaded"
+
 
     def summary(self):
         print(f"Model name:................ {self.name}")
