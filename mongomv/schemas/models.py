@@ -2,13 +2,13 @@ from pathlib import Path
 from typing import Any, List, Optional, TypeVar
 from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
-# from mongomv.services import PymongoService
+from mongomv.services import PymongoService
 from datetime import datetime
 
 from .enums import UpdateExperiment, UpdateModel, Collections, UpdateModelBase
 
 
-PymongoService = TypeVar("PymongoService")
+# PymongoService = TypeVar("PymongoService")
 
 
 class MetaEntity(BaseModel):
@@ -84,35 +84,6 @@ class MetaEntity(BaseModel):
         return self.model_dump(exclude_none=True, by_alias=True)
 
 
-class ExperimentEntity(MetaEntity):
-    collection: Collections = Field(default=Collections.experiments, exclude=True, repr=False)
-
-    models: Optional[List[ObjectId]] = Field(default_factory=list)
-
-    def add_model(self, model: ObjectId):
-        assert isinstance(model, ObjectId)
-        
-        result = self.service.update(
-            instance=self,
-            update=UpdateExperiment.add_model,
-            value=model
-        )
-        self.models.append(model)
-        return result
-
-
-    def remove_model(self, model: ObjectId):
-        assert isinstance(model, ObjectId)
-        result = self.service.update(
-            instance=self,
-            update=UpdateExperiment.remove_model,
-            value=model
-        )
-        index = self.models.index(model)
-        self.models.pop(index)
-        return result
-
-
 class ModelParams(BaseModel):
     parameter: str = Field(frozen=True)
     value: Any
@@ -123,14 +94,25 @@ class ModelMetrics(BaseModel):
     value: Any
 
 
+class SerializedModelEntity(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    id: Optional[ObjectId] = Field(frozen=True, alias="_id")
+    model_id: Optional[ObjectId] = None
+    model_path: Optional[Path | str] = None
+    filename: Optional[str] = None
+
+
 class ModelEntity(MetaEntity):
     collection: Collections = Field(default=Collections.models, exclude=True, repr=False)
 
     params: Optional[List[ModelParams]] = Field(default_factory=list)
     metrics: Optional[List[ModelMetrics]] = Field(default_factory=list)
     description: Optional[str] = None
-    serialized_model: Optional[ObjectId] = None
+    experiment_id: Optional[ObjectId] = None
+    serialized_model: Optional[SerializedModelEntity] = None
     model_path: Optional[Path] = None
+
 
     def add_param(self, params: ModelParams):
         assert type(params) == ModelParams, "params must be `ModelParams` type"
@@ -207,7 +189,12 @@ class ModelEntity(MetaEntity):
         >>> md.dump_model(model_path=path, filename=filename)
         ... "Model successfully serialized"
         """
-        self.serialized_model = self.service.dump(model_path, filename)
+        serialized_model_id = self.service.dump(model_path, filename)
+        self.serialized_model = SerializedModelEntity(
+            _id=serialized_model_id,
+            model_id=self.id,
+            filename=filename
+        )
         return "Model successfully serialized"
 
 
@@ -219,8 +206,8 @@ class ModelEntity(MetaEntity):
         """
         if self.serialized_model is None:
             raise KeyError("There is no serialized model")
-
-        if self.service.load(self.serialized_model, model_path):
+        if path := self.service.load(self.serialized_model, model_path):
+            self.serialized_model.model_path = path
             return "Model successfully loaded"
 
 
@@ -229,3 +216,45 @@ class ModelEntity(MetaEntity):
         print(f"Model tags:................ {self.tags}")
         print(f"Model description:......... {self.description}")
         print(f"Model creation date: ...... {self.date}")
+
+
+class ExperimentEntity(MetaEntity):
+    collection: Collections = Field(default=Collections.experiments, exclude=True, repr=False)
+
+    models: Optional[List[ObjectId]] = Field(default_factory=list)
+
+    def add_model(self, model: ModelEntity):
+        assert isinstance(model, ModelEntity)
+        assert model.experiment_id is None
+
+        result = self.service.update(
+            instance=self,
+            update=UpdateExperiment.add_model,
+            value=model.id
+        )
+        self.models.append(model)
+        self.service.mongomv.models.update_one(
+            {"_id": model.id},
+            {"$set": {"experiment_id": self.id}}
+        )
+        model.experiment_id = self.id
+        return result
+
+
+    def remove_model(self, model: ModelEntity):
+        assert isinstance(model, ModelEntity)
+        assert model.experiment_id is ObjectId
+
+        result = self.service.update(
+            instance=self,
+            update=UpdateExperiment.remove_model,
+            value=model.id
+        )
+        index = self.models.index(model)
+        self.models.pop(index)
+        self.service.mongomv.models.update_one(
+            {"_id": model.id},
+            {"$set": {"experiment_id": None}}
+        )
+        model.experiment_id = None
+        return result

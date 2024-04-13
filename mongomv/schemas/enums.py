@@ -4,6 +4,7 @@ from enum import Enum
 class Collections(Enum):
     experiments = "experiments"
     models = "models"
+    serialized = "serialized"
 
 
 class Instance(Enum):

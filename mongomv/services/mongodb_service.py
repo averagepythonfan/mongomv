@@ -8,21 +8,18 @@ from pymongo import MongoClient, CursorType
 from pymongo.results import UpdateResult
 from gridfs import GridFS
 
-from mongomv.schemas import (
-    ModelEntity,
-    ExperimentEntity,
+from mongomv.schemas.enums import (
+    Collections,
     FindBy,
     UpdateExperiment,
     UpdateModel,
-    ModelParams,
-    ModelMetrics,
     Collections
 )
 
 from .misc import query, update_query
 
 
-Instance = Union[ModelEntity, ExperimentEntity]
+Instance = Union[Collections.models, Collections.experiments]
 
 
 class PymongoService:
@@ -62,7 +59,7 @@ class PymongoService:
             raise FileNotFoundError("File does not exists")
 
 
-    def load(self, model_object_id: ObjectId, model_path: str | Path = None) -> bool:
+    def load(self, model_object_id: ObjectId, model_path: str | Path = None) -> Path | str:
         cur = self.fs.find_one({"_id": model_object_id})
         assert type(cur) not in (None, NoneType), "Serialized model not found"
 
@@ -75,7 +72,7 @@ class PymongoService:
 
         with open(model_path, "wb") as md:
             md.write(cur.read())
-        return True
+        return model_path
 
 
     @staticmethod
@@ -95,11 +92,11 @@ class PymongoService:
                     raise ValueError("There is multiple data, but flag `is_list` = False")
 
 
-    def create(self, instance: Instance) -> None:
+    def create(self, instance: Instance, **kwargs) -> None:
         """Create an instance of model or experiment."""
-        if isinstance(instance, ModelEntity):
-            self.models.insert_one(instance.to_dict())
-        elif isinstance(instance, ExperimentEntity):
+        if instance is Collections.models:
+            self.models.insert_one(kwargs)
+        elif instance is Collections.experiments:
             self.experiments.insert_one(instance.to_dict())
         else:
             raise KeyError("Instance must be `ModelEntity` or `ExperimentEnitity`")
@@ -109,7 +106,7 @@ class PymongoService:
              collection: Collections,
              find_by: FindBy,
              value: Union[str, datetime, List[str]] = None,
-             is_list: bool = False) -> List[Union[ExperimentEntity, ModelEntity]]:
+             is_list: bool = False) -> List[Instance]:
         params = {
             "find_by": find_by,
             "value": value
