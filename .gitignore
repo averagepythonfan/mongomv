@@ -7,5 +7,7 @@ dist
 /mongomv/core/__pycache__
 /mongomv/schemas/__pycache__
 /mongomv/services/__pycache__
+/mongomv/utils/__pycache__
+/mongomv/repository/__pycache__
 /tests/__pycache__
 lab

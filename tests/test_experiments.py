@@ -6,7 +6,7 @@ from tests.conftest import TEST_MONGO_URI
 
 @pytest.fixture(scope="module")
 def experiment():
-    client = MongoMVClient(mongo_uri=TEST_MONGO_URI)
+    client = MongoMVClient(uri=TEST_MONGO_URI)
     exp = client.create_experiment(name="fixture", tags=["testing", "pytest"])
     yield exp
     exp.delete()
@@ -14,7 +14,7 @@ def experiment():
 
 @pytest.fixture(scope="module")
 def model():
-    client = MongoMVClient(mongo_uri=TEST_MONGO_URI)
+    client = MongoMVClient(uri=TEST_MONGO_URI)
     md = client.create_model(name="test_model", tags=["testing", "pytest"])
     yield md
     md.delete()

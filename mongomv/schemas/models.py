@@ -2,13 +2,13 @@ from pathlib import Path
 from typing import Any, List, Optional, TypeVar
 from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
-from mongomv.services import PymongoService
+# from mongomv.services import PymongoService
 from datetime import datetime
 
 from .enums import UpdateExperiment, UpdateModel, Collections, UpdateModelBase
 
 
-# PymongoService = TypeVar("PymongoService")
+PymongoService = TypeVar("PymongoService")
 
 
 class MetaEntity(BaseModel):
@@ -20,6 +20,7 @@ class MetaEntity(BaseModel):
     name: str
     tags: list[str] = Field(default_factory=list)
     date: datetime = Field(default_factory=datetime.now, frozen=True)
+
 
     def add_tag(self, tags: list[str]):
         for el in tags:
@@ -60,24 +61,19 @@ class MetaEntity(BaseModel):
 
 
     def rename(self, new_name: str):
-        assert type(new_name) == str, f"new name must be `str`, not {type(new_name)}"
-        self.name = new_name
-        if self.collection is Collections.experiments:
-            return self.service.update(
-                instance=self,
-                update=UpdateExperiment.rename,
-                value=new_name
-            )
-        elif self.collection is Collections.models:
-            return self.service.update(
-                instance=self,
-                update=UpdateModelBase.rename,
-                value=new_name
-            )
+        result = self.service.update(
+            instance=self.collection.name,
+            obj_id=self.id,
+            update="$set",
+            value={"name": new_name}
+        )
+        if result == 1:
+            self.name = new_name
+            return f"Model successfully updated, new name: {new_name}"
 
 
     def delete(self) -> bool:
-        return self.service.delete(instance=self)
+        return self.service.delete(instance=self.collection.name, obj_id=self.id)
         
 
     def to_dict(self):
@@ -98,8 +94,8 @@ class SerializedModelEntity(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: Optional[ObjectId] = Field(frozen=True, alias="_id")
-    model_id: Optional[ObjectId] = None
-    model_path: Optional[Path | str] = None
+    entity_id: Optional[ObjectId] = None
+    serialized_model_path: Optional[Path | str] = None
     filename: Optional[str] = None
 
 
@@ -111,7 +107,7 @@ class ModelEntity(MetaEntity):
     description: Optional[str] = None
     experiment_id: Optional[ObjectId] = None
     serialized_model: Optional[SerializedModelEntity] = None
-    model_path: Optional[Path] = None
+    serialized_model_path: Optional[Path] = None
 
 
     def add_param(self, params: ModelParams):
@@ -192,7 +188,7 @@ class ModelEntity(MetaEntity):
         serialized_model_id = self.service.dump(model_path, filename)
         self.serialized_model = SerializedModelEntity(
             _id=serialized_model_id,
-            model_id=self.id,
+            entity_id=self.id,
             filename=filename
         )
         return "Model successfully serialized"

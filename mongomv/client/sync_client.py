@@ -1,6 +1,8 @@
-from typing import Any, Literal, Optional, List, Union
+from datetime import datetime
+from typing import Any, Dict, Literal, Optional, List, Union
 
-from mongomv.services import PymongoService
+from mongomv.services import PymongoCRUDService
+from mongomv.utils import not_none_return
 from mongomv.schemas import ModelEntity, ExperimentEntity, ModelParams, Collections, FindBy
 # from mongomv.services import PymongoService
 
@@ -13,7 +15,7 @@ class MongoMVClient:
     models_collections = "models"
 
 
-    def __init__(self, mongo_uri: str, **kwargs: Any) -> None:
+    def __init__(self, uri: str) -> None:
         """Enter the mongo URI, also accept `MongoClient` args.
         Initialize MongoDB client.
         Default arg for MongoClient: `timeoutMS` = 100.
@@ -23,23 +25,54 @@ class MongoMVClient:
         >>> uri = "mongodb://root:secret@localhost:27017"
         >>> client = MongoMVCLient(uri)
         """
-        self.mongo_service = PymongoService(mongo_uri)
+        self.crud = PymongoCRUDService(uri)
     
 
-    def create_experiment(self, name: str, tags: list) -> ExperimentEntity:
-        """Create an experiment instance.
-        
-        Requires name and tags. Return `ExperimentEntity` (mongomv.schemas.ExperimentEntity) instance.
-        Example:
-        >>> exp = client.create_experiment(name="keras_cv", tags=["dev", "v0.1"])
-        >>> exp.id
-        ... ObjectId('66105f81426f32b0c3d7e42f')
-        """
-        experiment = ExperimentEntity(name=name, tags=tags, service=self.mongo_service)
-        self.mongo_service.create(instance=experiment)
-        return experiment
+    @not_none_return
+    def create_experiment(self, name: str, tags: list[str]):
+        experiment = ExperimentEntity(
+            service=self.crud,
+            name=name,
+            tags=tags
+        )
+        if self.crud.create(
+            instance="experiments",
+            data=experiment.model_dump(exclude_none=True, by_alias=True)
+        ):
+            return experiment
 
 
+    @not_none_return
+    def list_of_experiments(self, num: int = 10, page: int = 0):
+        result = self.crud.read(instance="experiments", find_by={}, is_list=True)[num*page:num*(page+1)]
+        return [ExperimentEntity(service=self.crud, **el) for el in result]
+
+
+    @not_none_return
+    def find_experiment_by(self,
+                           find_by: Optional[Literal["id", "name", "date", "tags"]] = None,
+                           value: Optional[str] = None,
+                           query: Optional[Dict] = None,
+                           is_list: bool = False):
+        if find_by and query:
+            raise ValueError("Only `find_by` and `value` or `query` must be specified, not both.")
+        if find_by == "tags":
+            value = {"$in": value}
+        if find_by == "date":
+            assert type(value) == datetime
+            value = {"$lt": value}
+        result = self.crud.read(
+            instance="experiments",
+            find_by={find_by: value},
+            is_list=is_list
+        )
+        if is_list:
+            return [ExperimentEntity(service=self.crud, **el) for el in result]
+        else:
+            return ExperimentEntity(service=self.crud, **result)
+
+
+    @not_none_return
     def create_model(self,
                      name: str,
                      tags: List[str],
@@ -55,53 +88,30 @@ class MongoMVClient:
         ... ObjectId('66105f81426f1640c3d7e167')
         """
         model = ModelEntity(
+            service=self.crud,
             name=name,
             tags=tags,
             params=params,
-            description=description,
-            service=self.mongo_service
+            description=description
         )
-        self.mongo_service.create(instance=model)
-        return model
+        if self.crud.create(
+            instance="models",
+            data=model.model_dump(exclude_none=True, by_alias=True)
+        ):
+            return model
 
 
-    def list_of_experiments(self, num: int = 10, page: int = 0):
-        """Return list of `ExperimentEntity` instances.
-        
-        May set numbers and page.
-        """
-        cur = self.mongo_service.client.mongomv.experiments.find({})
-        lst = [ExperimentEntity(**el, service=self.mongo_service) for el in cur]
-        return lst[num*page:num*(page+1)]
-
-
+    @not_none_return
     def list_of_models(self, num: int = 10, page: int = 0):
         """Return list of `ModelEntity` instances.
         
         May set numbers and page.
         """
-        cur = self.mongo_service.client.mongomv.models.find({})
-        lst = [ModelEntity(**el, service=self.mongo_service) for el in cur]
-        return lst[num*page:num*(page+1)]
+        result = self.crud.read(instance="models", find_by={}, is_list=True)[num*page:num*(page+1)]
+        return [ModelEntity(service=self.crud, **el) for el in result]
 
 
-    def find_experiment_by(self,
-                           find_by: Literal["id", "name", "date", "tags"],
-                           value: str,
-                           is_list: bool = False):
-        """Find experiment by `id` or `name` or less than `date` or `tags`.
-
-        May return list of experiments is `is_list` is `True`.
-        """
-        find_result = self.mongo_service.read(
-            collection=Collections.experiments,
-            find_by=FindBy(find_by),
-            value=value,
-            is_list=is_list
-        )
-        return find_result if is_list else find_result[0]
-
-
+    @not_none_return
     def find_model_by(self,
                       find_by: Literal["id", "name", "date", "tags"],
                       value: str,
@@ -110,10 +120,12 @@ class MongoMVClient:
 
         May return list of experiments is `is_list` is `True`.
         """
-        find_result = self.mongo_service.read(
-            collection=Collections.models,
-            find_by=FindBy(find_by),
-            value=value,
+        result = self.crud.read(
+            instance="models",
+            find_by={find_by: value},
             is_list=is_list
         )
-        return find_result if is_list else find_result[0]
+        if is_list:
+            return [ModelEntity(service=self.crud, **el) for el in result]
+        else:
+            return ModelEntity(service=self.crud, **result)
