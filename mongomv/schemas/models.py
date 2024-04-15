@@ -22,45 +22,38 @@ class MetaEntity(BaseModel):
     date: datetime = Field(default_factory=datetime.now, frozen=True)
 
 
-    def add_tag(self, tags: list[str]):
+    def add_tag(self, tags: list[str]) -> Optional[str]:
         for el in tags:
             if not isinstance(el, str):
                 raise TypeError(f"Tags must be `list[str]`, not `list[{type(el)}]`")
-        self.tags.extend(tags)
-        if self.collection is Collections.experiments:
-            return self.service.update(
-                instance=self,
-                update=UpdateExperiment.add_tag,
-                value=tags
-            )
-        elif self.collection is Collections.models:
-            return self.service.update(
-                instance=self,
-                update=UpdateModelBase.add_tag,
-                value=tags
-            )
+        
+        result = self.service.update(
+            instance=self.collection.name,
+            obj_id=self.id,
+            update="$addToSet",
+            value={"tags": {"$each": tags}}
+        )
+        if result == 1:
+            self.tags = list(set(self.tags) | set(tags))
+            return f"Model successfully updated, added tags: {tags}"
 
 
-    def remove_tag(self, tags: list[str]):
+    def remove_tag(self, tags: list[str]) -> Optional[str]:
         for el in tags:
             if not isinstance(el, str):
                 raise TypeError(f"Tags must be `list[str]`, not `list[{type(el)}]`")
-        self.tags = list(set(self.tags) - set(tags))
-        if self.collection is Collections.experiments:
-            return self.service.update(
-                instance=self,
-                update=UpdateExperiment.remove_tag,
-                value=tags
-            )
-        elif self.collection is Collections.models:
-            return self.service.update(
-                instance=self,
-                update=UpdateModelBase.remove_tag,
-                value=tags
-            )
+        result = self.service.update(
+            instance=self.collection.name,
+            obj_id=self.id,
+            update="$pull",
+            value={"tags": {"$in": tags}}
+        )
+        if result == 1:
+            self.tags = list(set(self.tags) - set(tags))
+        
 
 
-    def rename(self, new_name: str):
+    def rename(self, new_name: str) -> Optional[str]:
         result = self.service.update(
             instance=self.collection.name,
             obj_id=self.id,
@@ -76,7 +69,7 @@ class MetaEntity(BaseModel):
         return self.service.delete(instance=self.collection.name, obj_id=self.id)
         
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return self.model_dump(exclude_none=True, by_alias=True)
 
 

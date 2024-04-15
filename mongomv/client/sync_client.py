@@ -1,13 +1,23 @@
 from datetime import datetime
-from typing import Any, Dict, Literal, Optional, List, Union
+from typing import Dict, Literal, Optional, List
 
 from mongomv.services import PymongoCRUDService
 from mongomv.utils import not_none_return
-from mongomv.schemas import ModelEntity, ExperimentEntity, ModelParams, Collections, FindBy
-# from mongomv.services import PymongoService
+from mongomv.schemas import ModelEntity, ExperimentEntity, ModelParams
 
 
 class MongoMVClient:
+    """Mongo model versioning class.
+    
+    Require a mongodb URI string to initialize MongoClient.
+    Also available several methods:
+        - `create_experiment` -> ExperimentEntity
+        - `create_model` -> ModelEntity
+        - `list_of_experiments` -> List[ExperimentEntity]
+        - `list_of_models` -> List[ModelEntity]
+        - `find_experiment_by` -> List[ExperimentEntity] | ExperimentEntity
+        - `find_model_by` -> List[ModelEntity] | ModelEntity.
+    """
 
     serialized_models_db = "serialized"
     mv_db = "mongomv"
@@ -15,7 +25,7 @@ class MongoMVClient:
     models_collections = "models"
 
 
-    def __init__(self, uri: str) -> None:
+    def __init__(self, uri: str, **kwargs) -> None:
         """Enter the mongo URI, also accept `MongoClient` args.
         Initialize MongoDB client.
         Default arg for MongoClient: `timeoutMS` = 100.
@@ -25,7 +35,7 @@ class MongoMVClient:
         >>> uri = "mongodb://root:secret@localhost:27017"
         >>> client = MongoMVCLient(uri)
         """
-        self.crud = PymongoCRUDService(uri)
+        self.crud = PymongoCRUDService(uri, **kwargs)
     
 
     @not_none_return
@@ -113,13 +123,21 @@ class MongoMVClient:
 
     @not_none_return
     def find_model_by(self,
-                      find_by: Literal["id", "name", "date", "tags"],
-                      value: str,
+                      find_by: Optional[Literal["id", "name", "date", "tags"]],
+                      value: Optional[str] = None,
+                      query: Optional[dict] =None,
                       is_list: bool = False):
         """Find model by `id` or `name` or less than `date` or `tags`.
 
         May return list of experiments is `is_list` is `True`.
         """
+        if find_by and query:
+            raise ValueError("Only `find_by` and `value` or `query` must be specified, not both.")
+        if find_by == "tags":
+            value = {"$in": value}
+        if find_by == "date":
+            assert type(value) == datetime
+            value = {"$lt": value}
         result = self.crud.read(
             instance="models",
             find_by={find_by: value},

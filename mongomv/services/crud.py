@@ -7,14 +7,17 @@ from pymongo import MongoClient
 from bson import ObjectId
 
 
+Instance = Literal["experiments", "models"]
+
+
 class PymongoCRUDService:
 
-    def __init__(self, mongo_uri: str):
-        self.uow = UnitOfWork(MongoClient(mongo_uri))
+    def __init__(self, mongo_uri: str, **kwargs):
+        self.uow = UnitOfWork(MongoClient(mongo_uri, **kwargs))
 
 
     @not_none_return
-    def create(self, instance: Literal["experiments", "models"], data: Dict) -> bool:
+    def create(self, instance: Instance, data: Dict) -> bool:
         if instance == "experiments":
             with self.uow:
                 return self.uow.experiments.save_one(data)
@@ -27,7 +30,7 @@ class PymongoCRUDService:
 
     @not_none_return
     def read(self,
-             instance: Literal["experiments", "models"],
+             instance: Instance,
              find_by: Dict,
              is_list: bool = False) -> Optional[Dict]:
         if instance == "experiments":
@@ -50,10 +53,14 @@ class PymongoCRUDService:
 
     @not_none_return
     def update(self,
-               instance: Literal["experiments", "models"],
+               instance: Instance,
                obj_id: ObjectId,
-               update: Literal["$set", "$push", "$pull"],
+               update: Literal["$set", "$push", "$pull", "$addToSet"],
                value: Any) -> Optional[int]:
+
+        if update not in ["$set", "$push", "$pull", "$addToSet"]:
+            raise ValueError(f"Update must be `$set`, `$addToSet`, `$push` or `$pull`, not {update}")
+
         if instance == "experiments":
             with self.uow:
                 return self.uow.experiments.update_by_object_id(obj_id=obj_id, update_query={update: value})
@@ -65,7 +72,7 @@ class PymongoCRUDService:
 
 
     @not_none_return
-    def delete(self, instance: Literal["experiments", "models"], obj_id: ObjectId) -> Optional[int]:
+    def delete(self, instance: Instance, obj_id: ObjectId) -> Optional[int]:
         if instance == "experiments":
             with self.uow:
                 return self.uow.experiments.delete(obj_id=obj_id)
