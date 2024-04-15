@@ -119,59 +119,87 @@ class ModelEntity(MetaEntity):
             return True
 
 
-    def add_param(self, params: ModelParams):
+    @not_none_return
+    def add_param(self, params: ModelParams) -> Optional[str]:
         assert type(params) == ModelParams, "params must be `ModelParams` type"
 
         result = self.service.update(
-            instance=self,
-            update=UpdateModel.add_params,
-            value=params
+            instance="models",
+            obj_id=self.id,
+            update="$push",
+            value={"params": params.model_dump()}
         )
-        self.params.append(params)
-        return result
+        if result == 1:
+            self.params.append(params)
+            return f"Params successfully added"
 
 
-    def remove_param(self, params: ModelParams):
+    @not_none_return
+    def remove_param(self, param_name: str) -> Optional[str]:
+        index = None
+        for el in self.params:
+            if el.parameter == param_name:
+                index = self.params.index(el)
+        if index is None:
+            raise KeyError(f"There is no parameter with {param_name} name.")
+        
         result = self.service.update(
-            instance=self,
-            update=UpdateModel.remove_params,
-            value=params
+            instance="models",
+            obj_id=self.id,
+            update="$pull",
+            value={"params": {"parameter": {"$in": [param_name]}}}
         )
-        index = self.params.index(params)
-        self.params.pop(index)
-        return result
+        if result == 1:
+            self.params.pop(index)
+            return "Params successfully removed"
 
 
+    @not_none_return
     def add_metric(self, metrics: ModelMetrics):
-        assert type(metrics) == ModelParams, "metrics must be `ModelMetrics` type"
+        assert type(metrics) == ModelMetrics, "metrics must be `ModelMetrics` type"
+
         result = self.service.update(
-            instance=self,
-            update=UpdateModel.add_metric,
-            value=metrics
+            instance="models",
+            obj_id=self.id,
+            update="$push",
+            value={"metrics": metrics.model_dump()}
         )
-        self.metrics.append(metrics)
-        return result
+        if result == 1:
+            self.metrics.append(metrics)
+            return f"Metrics successfully added"
 
 
-    def remove_metric(self, metrics: ModelMetrics):
+    @not_none_return
+    def remove_metric(self, metric_name: str):
+        index = None
+        for el in self.metrics:
+            if el.metric == metric_name:
+                index = self.metrics.index(el)
+        if index is None:
+            raise KeyError(f"There is no parameter with {metric_name} name.")
+        
         result = self.service.update(
-            instance=self,
-            update=UpdateModel.remove_metric,
-            value=metrics
+            instance="models",
+            obj_id=self.id,
+            update="$pull",
+            value={"metrics": {"metric": {"$in": [metric_name]}}}
         )
-        ind = self.metrics.index(metrics)
-        self.metrics.pop(ind)
-        return result
+        if result == 1:
+            self.metrics.pop(index)
+            return "Metrics successfully removed"
 
 
+    @not_none_return
     def set_description(self, description: str):
         result = self.service.update(
-            instance=self,
-            update=UpdateModelBase.set_description,
-            value=description
+            instance="models",
+            obj_id=self.id,
+            update="$set",
+            value={"description": description}
         )
-        self.description = description
-        return result
+        if result == 1:
+            self.description = description
+            return "Description set"
 
 
     def dump_model(self, model_path, filename) -> str:
