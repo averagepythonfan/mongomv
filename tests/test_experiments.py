@@ -22,7 +22,19 @@ def model():
     md.delete()
 
 
-@pytest.mark.usefixtures("mongomv_client")
+# @pytest.mark.usefixtures("mongomv_client")
 class TestExperimentEntity:
 
-    pass
+    
+    def test_add_model_to_experiment(self, experiment: ExperimentEntity, model: ModelEntity):
+        response = experiment.add_model(model=model)
+        assert type(response) == str
+        assert model.experiment_id == experiment.id
+        assert model.id in experiment.models
+
+
+    def test_remove_model_from_experiment(self, experiment: ExperimentEntity, model: ModelEntity):
+        response = experiment.remove_model(model=model)
+        assert type(response) == str
+        assert model.id not in experiment.models
+        assert model.experiment_id == None

@@ -8,5 +8,5 @@ def not_none_return(func):
         if result is not None:
             return result
         else:
-            raise TypeError("Result is None")
+            raise TypeError("Result is None.")
     return wrapper

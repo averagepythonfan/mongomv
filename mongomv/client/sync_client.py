@@ -39,6 +39,23 @@ class MongoMVClient:
     
 
     @not_none_return
+    def _query_maker_for_finding(self,
+                                 find_by: Optional[Literal["id", "name", "date", "tags"]] = None,
+                                 value: Optional[str] = None,
+                                 query: Optional[Dict] = None) -> dict:
+        if find_by and query:
+            raise ValueError("Only `find_by` and `value` or `query` must be specified, not both.")
+        if query and find_by:
+            return query
+        if find_by == "tags":
+            value = {"$in": value}
+        elif find_by == "date":
+            assert type(value) == datetime
+            value = {"$lt": value}
+        return {find_by: value}
+
+
+    @not_none_return
     def create_experiment(self, name: str, tags: list[str]):
         experiment = ExperimentEntity(
             service=self.crud,
@@ -54,6 +71,10 @@ class MongoMVClient:
 
     @not_none_return
     def list_of_experiments(self, num: int = 10, page: int = 0):
+        """Return a list of existing experiments.
+        
+        Might set numbers (default = 10) and pages (default = 0) of list.
+        """
         result = self.crud.read(instance="experiments", find_by={}, is_list=True)[num*page:num*(page+1)]
         return [ExperimentEntity(service=self.crud, **el) for el in result]
 
@@ -63,17 +84,15 @@ class MongoMVClient:
                            find_by: Optional[Literal["id", "name", "date", "tags"]] = None,
                            value: Optional[str] = None,
                            query: Optional[Dict] = None,
-                           is_list: bool = False):
-        if find_by and query:
-            raise ValueError("Only `find_by` and `value` or `query` must be specified, not both.")
-        if find_by == "tags":
-            value = {"$in": value}
-        if find_by == "date":
-            assert type(value) == datetime
-            value = {"$lt": value}
+                           is_list: bool = False) -> ExperimentEntity | List[ExperimentEntity]:
+        """Find experiment by `id` or `name` or less than `date` or `tags`.
+
+        May return list of experiments is `is_list` is `True`.
+        """
+        q = self._query_maker_for_finding(find_by=find_by, value=value, query=query)
         result = self.crud.read(
             instance="experiments",
-            find_by={find_by: value},
+            find_by=q,
             is_list=is_list
         )
         if is_list:
@@ -129,18 +148,12 @@ class MongoMVClient:
                       is_list: bool = False):
         """Find model by `id` or `name` or less than `date` or `tags`.
 
-        May return list of experiments is `is_list` is `True`.
+        May return list of models is `is_list` is `True`.
         """
-        if find_by and query:
-            raise ValueError("Only `find_by` and `value` or `query` must be specified, not both.")
-        if find_by == "tags":
-            value = {"$in": value}
-        if find_by == "date":
-            assert type(value) == datetime
-            value = {"$lt": value}
+        q = self._query_maker_for_finding(find_by=find_by, value=value, query=query)
         result = self.crud.read(
             instance="models",
-            find_by={find_by: value},
+            find_by=q,
             is_list=is_list
         )
         if is_list:

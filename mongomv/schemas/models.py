@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Any, List, Optional, TypeVar
 from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
-# from mongomv.services import PymongoService
+from mongomv.utils import not_none_return
 from datetime import datetime
 
 from .enums import UpdateExperiment, UpdateModel, Collections, UpdateModelBase
@@ -22,6 +22,7 @@ class MetaEntity(BaseModel):
     date: datetime = Field(default_factory=datetime.now, frozen=True)
 
 
+    @not_none_return
     def add_tag(self, tags: list[str]) -> Optional[str]:
         for el in tags:
             if not isinstance(el, str):
@@ -38,6 +39,7 @@ class MetaEntity(BaseModel):
             return f"Model successfully updated, added tags: {tags}"
 
 
+    @not_none_return
     def remove_tag(self, tags: list[str]) -> Optional[str]:
         for el in tags:
             if not isinstance(el, str):
@@ -50,9 +52,10 @@ class MetaEntity(BaseModel):
         )
         if result == 1:
             self.tags = list(set(self.tags) - set(tags))
-        
+            return f"Model successfully updated, removed tags: {tags}"        
 
 
+    @not_none_return
     def rename(self, new_name: str) -> Optional[str]:
         result = self.service.update(
             instance=self.collection.name,
@@ -103,10 +106,23 @@ class ModelEntity(MetaEntity):
     serialized_model_path: Optional[Path] = None
 
 
+    @not_none_return
+    def _set_experiment_id(self, experiment_id: ObjectId | None) -> Optional[bool]:
+        result = self.service.update(
+            instance="models",
+            obj_id=self.id,
+            update="$set",
+            value={"experiment_id": experiment_id}
+        )
+        if result == 1:
+            self.experiment_id = experiment_id
+            return True
+
+
     def add_param(self, params: ModelParams):
         assert type(params) == ModelParams, "params must be `ModelParams` type"
 
-        result=  self.service.update(
+        result = self.service.update(
             instance=self,
             update=UpdateModel.add_params,
             value=params
@@ -212,38 +228,41 @@ class ExperimentEntity(MetaEntity):
 
     models: Optional[List[ObjectId]] = Field(default_factory=list)
 
+
+    @not_none_return
     def add_model(self, model: ModelEntity):
         assert isinstance(model, ModelEntity)
-        assert model.experiment_id is None
+        assert model.experiment_id is None, f"Model is already linked to {model.experiment_id}"
+        assert model.service is not None, "There is no service in model"
 
         result = self.service.update(
-            instance=self,
-            update=UpdateExperiment.add_model,
-            value=model.id
+            instance="experiments",
+            obj_id=self.id,
+            update="$addToSet",
+            value={"models": {"$each": [model.id]}}
         )
-        self.models.append(model)
-        self.service.mongomv.models.update_one(
-            {"_id": model.id},
-            {"$set": {"experiment_id": self.id}}
-        )
-        model.experiment_id = self.id
-        return result
+        if result == 1:
+            self.models.append(model.id)
+            if model._set_experiment_id(experiment_id=self.id):
+                model.experiment_id = self.id
+                return f"Model {model.name} successfully added to experiment"
 
 
+    @not_none_return
     def remove_model(self, model: ModelEntity):
         assert isinstance(model, ModelEntity)
-        assert model.experiment_id is ObjectId
+        assert model.id in self.models, "Model not in models"
+        assert model.experiment_id == self.id, "Model does not linked to experiment"
+        assert model.service is not None, "There is not service in model"
 
         result = self.service.update(
-            instance=self,
-            update=UpdateExperiment.remove_model,
-            value=model.id
+            instance="experiments",
+            obj_id=self.id,
+            update="$pull",
+            value={"models": {"$in": [model.id]}}
         )
-        index = self.models.index(model)
-        self.models.pop(index)
-        self.service.mongomv.models.update_one(
-            {"_id": model.id},
-            {"$set": {"experiment_id": None}}
-        )
-        model.experiment_id = None
-        return result
+        if result == 1:
+            if model._set_experiment_id(experiment_id=None):
+                index = self.models.index(model.id)
+                self.models.pop(index)
+                return f"Model {model.name} successfully removed from experiment"

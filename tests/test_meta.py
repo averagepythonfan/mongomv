@@ -92,3 +92,31 @@ class TestMetaEntity:
             md = mongomv_client.find_model_by(find_by="tags", value=tags)
             for el in tags:
                 assert el in md.tags
+
+
+    @pytest.mark.parametrize(
+        argnames="tags",
+        argvalues=[
+            (["new", "tags"]),
+            (["valid", "pytest"]),
+        ]
+    )
+    def test_remove_tags_from_experiments(self, tags, experiment: ExperimentEntity):
+        response = experiment.remove_tag(tags=tags)
+        assert type(response) == str
+        for el in tags:
+            assert el not in experiment.tags
+
+
+    @pytest.mark.parametrize(
+        argnames="tags",
+        argvalues=[
+            (["model", "tags"]),
+            (["several", "v0.1"]),
+        ]
+    )
+    def test_remove_tags_from_model(self, tags, model: ModelEntity):
+        response = model.remove_tag(tags=tags)
+        assert type(response) == str
+        for el in tags:
+            assert el not in model.tags
