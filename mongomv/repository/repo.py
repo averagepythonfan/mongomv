@@ -1,5 +1,9 @@
-from typing import Dict, Any
+import os
+from pathlib import Path
+from types import NoneType
+from typing import Dict, Any, Optional
 
+from gridfs import GridIn, GridOut
 from pymongo.client_session import ClientSession
 from pymongo.cursor import Cursor
 from pymongo.results import DeleteResult, InsertOneResult, UpdateResult
@@ -62,3 +66,46 @@ class ExperimentsRepository(PymongoRepository):
 
 class ModelsRepository(PymongoRepository):
     collection = "models"
+
+
+
+class GridFSRepository:
+
+    database = "serialized"
+    collection = "models"
+
+    def __init__(self, session: ClientSession):
+        self.session = session
+        self.db = self.session.client.get_database(name=self.database)
+        self.root_collection = self.db.get_collection(name=self.collection)
+        self.gridin = GridIn
+        self.gridout = GridOut
+
+
+    def put(self, model_path: Path, data: Dict) -> Optional[bool]:
+        with open(file=model_path, mode="rb") as file:
+            if file.readable():
+                with self.gridin(root_collection=self.root_collection, session=self.session, **data) as gridin:
+                    if gridin.writeable():
+                        if gridin.write(data=file.read()) is None:
+                            return True
+            else:
+                raise FileExistsError("File not readable")
+
+
+    def get(self, obj_id: ObjectId, model_path: Optional[Path] = None) -> Optional[bool]:
+        with self.gridout(root_collection=self.root_collection, session=self.session, file_id=obj_id) as gridout:
+            path: Path = model_path if model_path else gridout.serialized_model_path
+            if path.exists():
+                raise FileExistsError("File is already exists")
+            if gridout.readable():
+                with open(path, "wb") as md:
+                    md.write(gridout.read())
+                    return True
+
+
+    def delete(self, obj_id: ObjectId):
+        result = self.root_collection.files.delete_one({"_id": obj_id}, session=self.session)
+        result_ = self.root_collection.chunks.delete_many({"files_id": obj_id}, session=self.session)
+        if result.deleted_count != 0 and result_.deleted_count != 0:
+            return True

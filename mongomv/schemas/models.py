@@ -1,11 +1,11 @@
-from pathlib import Path
+from pathlib import Path, PosixPath
 from typing import Any, List, Optional, TypeVar
 from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
 from mongomv.utils import not_none_return
 from datetime import datetime
 
-from .enums import UpdateExperiment, UpdateModel, Collections, UpdateModelBase
+from .enums import Collections
 
 
 PymongoService = TypeVar("PymongoService")
@@ -89,10 +89,13 @@ class ModelMetrics(BaseModel):
 class SerializedModelEntity(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    id: Optional[ObjectId] = Field(frozen=True, alias="_id")
-    entity_id: Optional[ObjectId] = None
-    serialized_model_path: Optional[Path | str] = None
-    filename: Optional[str] = None
+    id: ObjectId = Field(default_factory=lambda: ObjectId(), frozen=True, alias="_id")
+    entity_id: ObjectId
+    serialized_model_path: str
+    filename: str
+    chunkSize: int = Field(default=261120, frozen=True)
+    length: Optional[int] = None
+    uploadDate: datetime = Field(default_factory=datetime.now, frozen=True)
 
 
 class ModelEntity(MetaEntity):
@@ -103,7 +106,6 @@ class ModelEntity(MetaEntity):
     description: Optional[str] = None
     experiment_id: Optional[ObjectId] = None
     serialized_model: Optional[SerializedModelEntity] = None
-    serialized_model_path: Optional[Path] = None
 
 
     @not_none_return
@@ -202,6 +204,7 @@ class ModelEntity(MetaEntity):
             return "Description set"
 
 
+    @not_none_return
     def dump_model(self, model_path, filename) -> str:
         """Dump model to MongoDB file storage using GridFS.
         
@@ -222,26 +225,45 @@ class ModelEntity(MetaEntity):
         >>> md.dump_model(model_path=path, filename=filename)
         ... "Model successfully serialized"
         """
-        serialized_model_id = self.service.dump(model_path, filename)
+        model_path: Path = Path(model_path) if isinstance(model_path, str) else model_path
+
+        assert type(model_path) == PosixPath, "File path must be `pathlib.Path` or `str` type"
+        assert model_path.exists(), "File does not exist"
+        assert self.serialized_model is None, "There is serialized model, please delete this one"
+
         self.serialized_model = SerializedModelEntity(
-            _id=serialized_model_id,
             entity_id=self.id,
+            serialized_model_path=model_path.as_posix(),
             filename=filename
         )
-        return "Model successfully serialized"
+        with self.service.uow as uow:
+            if uow.gridfs.put(model_path, self.serialized_model.model_dump(by_alias=True)):
+                return "Model successfully serialized"
 
 
-    def load_model(self, model_path: str = None):
+    @not_none_return
+    def load_model(self, model_path: Optional[Path | str] = None):
         """Load model from MongoDB file storage using GridFS.
         
         Requires serialized model id (look `dump_model`)
         and model. If model path not set, then default path is `cwd/tmp/filename`.
         """
         if self.serialized_model is None:
-            raise KeyError("There is no serialized model")
-        if path := self.service.load(self.serialized_model, model_path):
-            self.serialized_model.model_path = path
-            return "Model successfully loaded"
+            raise KeyError("There is no serialized model") 
+        with self.service.uow as uow:
+            if uow.gridfs.get(self.serialized_model.id, model_path):
+                self.serialized_model.serialized_model_path = model_path
+                return "Model successfully loaded"
+
+
+    @not_none_return
+    def delete_model(self) -> Optional[str]:
+        assert type(self.serialized_model) == SerializedModelEntity
+
+        with self.service.uow as uow:
+            if uow.gridfs.delete(obj_id=self.serialized_model.id):
+                self.serialized_model = None
+                return "Serialized model successfully deleted from MongoDB file storage"
 
 
     def summary(self):

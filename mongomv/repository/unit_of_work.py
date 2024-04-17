@@ -2,7 +2,7 @@ from typing import Type
 
 from pymongo import MongoClient
 
-from .repo import ExperimentsRepository, ModelsRepository
+from .repo import ExperimentsRepository, ModelsRepository, GridFSRepository
 
 
 class UnitOfWork:
@@ -18,6 +18,7 @@ class UnitOfWork:
 
         self.experiments = ExperimentsRepository(session=self.session)
         self.models = ModelsRepository(session=self.session)
+        self.gridfs = GridFSRepository(session=self.session)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
