@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mongomv"
-version = "0.1.1.post5"
+version = "0.2.0.post0"
 description = "Fast framework for model versioning"
 authors = ["averagepythonfan <djonvorobei@bk.ru>"]
 license = "MIT"
