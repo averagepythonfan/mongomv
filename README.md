@@ -9,7 +9,7 @@
 5. We use MongoMV
 
 ## How it works:
-[Scheme](docs/pics/scheme.jpg)
+![Scheme](docs/pics/scheme.jpg)
 
 ## Install now
 
