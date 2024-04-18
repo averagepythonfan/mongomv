@@ -1,12 +1,13 @@
+from datetime import datetime
 from pathlib import Path, PosixPath
 from typing import Any, List, Optional, TypeVar
+
 from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
+
 from mongomv.utils import not_none_return
-from datetime import datetime
 
 from .enums import Collections
-
 
 PymongoService = TypeVar("PymongoService")
 
@@ -27,7 +28,7 @@ class MetaEntity(BaseModel):
         for el in tags:
             if not isinstance(el, str):
                 raise TypeError(f"Tags must be `list[str]`, not `list[{type(el)}]`")
-        
+
         result = self.service.update(
             instance=self.collection.name,
             obj_id=self.id,
@@ -52,7 +53,7 @@ class MetaEntity(BaseModel):
         )
         if result == 1:
             self.tags = list(set(self.tags) - set(tags))
-            return f"Model successfully updated, removed tags: {tags}"        
+            return f"Model successfully updated, removed tags: {tags}"
 
 
     @not_none_return
@@ -70,7 +71,7 @@ class MetaEntity(BaseModel):
 
     def delete(self) -> bool:
         return self.service.delete(instance=self.collection.name, obj_id=self.id)
-        
+
 
     def to_dict(self) -> dict:
         return self.model_dump(exclude_none=True, by_alias=True)
@@ -133,7 +134,7 @@ class ModelEntity(MetaEntity):
         )
         if result == 1:
             self.params.append(params)
-            return f"Params successfully added"
+            return "Params successfully added"
 
 
     @not_none_return
@@ -144,7 +145,7 @@ class ModelEntity(MetaEntity):
                 index = self.params.index(el)
         if index is None:
             raise KeyError(f"There is no parameter with {param_name} name.")
-        
+
         result = self.service.update(
             instance="models",
             obj_id=self.id,
@@ -168,7 +169,7 @@ class ModelEntity(MetaEntity):
         )
         if result == 1:
             self.metrics.append(metrics)
-            return f"Metrics successfully added"
+            return "Metrics successfully added"
 
 
     @not_none_return
@@ -179,7 +180,7 @@ class ModelEntity(MetaEntity):
                 index = self.metrics.index(el)
         if index is None:
             raise KeyError(f"There is no parameter with {metric_name} name.")
-        
+
         result = self.service.update(
             instance="models",
             obj_id=self.id,
@@ -207,7 +208,7 @@ class ModelEntity(MetaEntity):
     @not_none_return
     def dump_model(self, model_path, filename) -> str:
         """Dump model to MongoDB file storage using GridFS.
-        
+
         Requires serialized model path and filename.
         Return `str`: "Model successfully serialized"
 
@@ -244,12 +245,12 @@ class ModelEntity(MetaEntity):
     @not_none_return
     def load_model(self, model_path: Optional[Path | str] = None):
         """Load model from MongoDB file storage using GridFS.
-        
+
         Requires serialized model id (look `dump_model`)
         and model. If model path not set, then default path is `cwd/tmp/filename`.
         """
         if self.serialized_model is None:
-            raise KeyError("There is no serialized model") 
+            raise KeyError("There is no serialized model")
         with self.service.uow as uow:
             if uow.gridfs.get(self.serialized_model.id, model_path):
                 self.serialized_model.serialized_model_path = model_path

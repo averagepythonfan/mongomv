@@ -1,14 +1,14 @@
 from datetime import datetime
-from typing import Dict, Literal, Optional, List
+from typing import Dict, List, Literal, Optional
 
+from mongomv.schemas import ExperimentEntity, ModelEntity, ModelParams
 from mongomv.services import PymongoCRUDService
 from mongomv.utils import not_none_return
-from mongomv.schemas import ModelEntity, ExperimentEntity, ModelParams
 
 
 class MongoMVClient:
     """Mongo model versioning class.
-    
+
     Require a mongodb URI string to initialize MongoClient.
     Also available several methods:
         - `create_experiment` -> ExperimentEntity
@@ -29,14 +29,14 @@ class MongoMVClient:
         """Enter the mongo URI, also accept `MongoClient` args.
         Initialize MongoDB client.
         Default arg for MongoClient: `timeoutMS` = 100.
-        
+
         Example:
-        >>> from mongomv import MongoMVCLient 
+        >>> from mongomv import MongoMVCLient
         >>> uri = "mongodb://root:secret@localhost:27017"
         >>> client = MongoMVCLient(uri)
         """
         self.crud = PymongoCRUDService(uri, **kwargs)
-    
+
 
     @not_none_return
     def _query_maker_for_finding(self,
@@ -57,6 +57,19 @@ class MongoMVClient:
 
     @not_none_return
     def create_experiment(self, name: str, tags: list[str]):
+        """Create an experiment instance.
+        
+        Requires:
+            - `name`: must be `str`
+            - `tags`: must be list of strings, otherwise raise `ValidationError`
+        Return:
+            `mongomv.schemas.ExperimentEntity` instance.
+        
+        Examples:
+        >>> exp = client.create_experiment(name="first_run", tags=["dev", "test"])
+        >>> print(exp.name)
+        ... "first_run"
+        """
         experiment = ExperimentEntity(
             service=self.crud,
             name=name,
@@ -72,8 +85,11 @@ class MongoMVClient:
     @not_none_return
     def list_of_experiments(self, num: int = 10, page: int = 0):
         """Return a list of existing experiments.
-        
+
         Might set numbers (default = 10) and pages (default = 0) of list.
+
+        Return:
+            `List[ExperimentEntity]`
         """
         result = self.crud.read(instance="experiments", find_by={}, is_list=True)[num*page:num*(page+1)]
         return [ExperimentEntity(service=self.crud, **el) for el in result]
@@ -88,6 +104,26 @@ class MongoMVClient:
         """Find experiment by `id` or `name` or less than `date` or `tags`.
 
         May return list of experiments is `is_list` is `True`.
+
+        Requires:
+            - `find_by`: Optional, string must be `id`, `name`, `date` or `tags`
+            - `value`: Optional, for `id` must be `bson.ObjectId` instance,
+                       for `name` must be `str`
+                       for `date` must be `datetime.datetime`
+                       for `tags` must be list of strings
+            - `query`: Optional, raw request to MongoDB, must be `dict`.
+                       If `find_by` and `query` both set, raise `ValueError`
+            - `is_list`: bool, default value is `False`,
+                         if `is_list` is `True` returns an instance of
+                         `mongomv.schemas.ExperimentEntity`, otherwise
+                         returns list of experiments.
+        
+        Examples:
+        >>> exp_1 = client.find_experiment_by(find_by="id", value=ObjectId('66210f710bf0a3d78586ac6f'))
+        >>> exp_2 = client.find_experiment_by(find_by="name", value="first_try")
+        >>> exps = client.find_experiment_by(find_by="date", value=datetime.datetime.now(), is_list=True)
+        >>> exp_3 = client.find_experiment_by(find_by="tags", value=["dev"])
+        >>> exp_4 = client.find_experiment_by(query={"_id": ObjectId('66210f710bf0a3d78586ac6f')})
         """
         q = self._query_maker_for_finding(find_by=find_by, value=value, query=query)
         result = self.crud.read(
@@ -108,7 +144,7 @@ class MongoMVClient:
                      params: Optional[List[ModelParams]] = [],
                      description: str = None) -> ModelEntity:
         """Create an model instance.
-        
+
         Requires name and tags. Optional params and description.
         Return `ModelEntity` (mongomv.schemas.ModelEntity) instance.
         Example:
@@ -133,7 +169,7 @@ class MongoMVClient:
     @not_none_return
     def list_of_models(self, num: int = 10, page: int = 0):
         """Return list of `ModelEntity` instances.
-        
+
         May set numbers and page.
         """
         result = self.crud.read(instance="models", find_by={}, is_list=True)[num*page:num*(page+1)]

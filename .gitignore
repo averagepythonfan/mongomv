@@ -2,6 +2,7 @@ pymongo.ipynb
 dist
 .ipynb_checkpoints
 .pytest_cache
+.ruff_cache
 /mongomv/__pycache__
 /mongomv/client/__pycache__
 /mongomv/core/__pycache__

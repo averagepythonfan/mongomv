@@ -1,7 +1,7 @@
 import datetime
-from typing import Union, List, Any
-from mongomv.schemas import FindBy, UpdateExperiment, UpdateModel, UpdateModelBase
+from typing import Any, List, Union
 
+from mongomv.schemas import FindBy, UpdateExperiment, UpdateModel, UpdateModelBase
 
 
 def query(find_by: FindBy, value: Union[str, datetime.datetime, List[str]]):

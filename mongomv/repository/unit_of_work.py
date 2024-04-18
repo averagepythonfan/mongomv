@@ -2,7 +2,7 @@ from typing import Type
 
 from pymongo import MongoClient
 
-from .repo import ExperimentsRepository, ModelsRepository, GridFSRepository
+from .repo import ExperimentsRepository, GridFSRepository, ModelsRepository
 
 
 class UnitOfWork:

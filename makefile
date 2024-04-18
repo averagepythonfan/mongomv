@@ -13,3 +13,6 @@ run_tests:
 	sleep 1
 	poetry run pytest -v
 	docker compose -f docker-compose-dev.yml down
+
+ruff_check:
+	ruff check mongomv/ --fix

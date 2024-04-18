@@ -1,11 +1,10 @@
-from typing import Literal, Dict, Optional, Any
-from functools import wraps
+from typing import Any, Dict, Literal, Optional
+
+from bson import ObjectId
+from pymongo import MongoClient
 
 from mongomv.repository import UnitOfWork
 from mongomv.utils import not_none_return
-from pymongo import MongoClient
-from bson import ObjectId
-
 
 Instance = Literal["experiments", "models"]
 

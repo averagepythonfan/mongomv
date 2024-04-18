@@ -1,13 +1,11 @@
-import os
 from pathlib import Path
-from types import NoneType
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
+from bson import ObjectId
 from gridfs import GridIn, GridOut
 from pymongo.client_session import ClientSession
 from pymongo.cursor import Cursor
 from pymongo.results import DeleteResult, InsertOneResult, UpdateResult
-from bson import ObjectId
 
 
 class PymongoRepository:
