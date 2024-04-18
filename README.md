@@ -1,11 +1,15 @@
-# MongoMV - fast, light and clear framework to versioning your TensorFlow models
+# MongoMV - fast, light and clear framework to versioning your machine learning models
 
-## What is that all about?
+## Why MongoMV?
 
-1. We develope machine learning models
-2. We use MongoDB in production
-2. We need light and fast framework to versioning models
-3. We use MongoMV
+1. It simple: only Pymongo and Pydantic dependecies
+2. We develope machine learning models
+3. We use MongoDB in production
+4. We need light and fast framework to versioning models
+5. We use MongoMV
+
+## How it works:
+[Scheme](docs/pics/scheme.jpg)
 
 ## Install now
 
@@ -32,6 +36,13 @@ and then up mongodb container:
 ~$: docker compose up -d
 ```
 
+## Model Serialization:
+- [TensorFlow and Keras](https://www.tensorflow.org/guide/keras/serialization_and_saving)
+- [XGBoost](https://xgboost.readthedocs.io/en/stable/tutorials/saving_model.html)
+- [sk-learn](https://scikit-learn.org/stable/model_persistence.html)
+- [LightGBM](https://lightgbm.readthedocs.io/en/latest/R/reference/lgb.save.html)
+- [PyTorch](https://pytorch.org/tutorials/beginner/saving_loading_models.html)
+
 ## Code example:
 
 ```Python
@@ -43,5 +54,10 @@ and then up mongodb container:
 >>> md = client.create_model(name="test_md", tags=["test", "v0.1"])
 >>> md.id
 ... ObjectId('6584339e394f866bc0096607')
+>>> path = "your_serialized_model_path"
+>>> md.dump_model(model_path=path, filename="your_model_filename")
+... "Model successfully serialized"
+>>> exp.add_model(md)
+... "Model test_md successfully added to experiment"
 
 ```
