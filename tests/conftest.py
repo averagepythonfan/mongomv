@@ -2,7 +2,7 @@ import pytest
 from mongomv import MongoMVClient
 
 
-TEST_MONGO_URI = "mongodb://test:test@localhost:27017"
+TEST_MONGO_URI = "mongodb://test:test@localhost:27018"
 
 
 @pytest.fixture(scope="session")

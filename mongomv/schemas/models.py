@@ -239,7 +239,16 @@ class ModelEntity(MetaEntity):
         )
         with self.service.uow as uow:
             if uow.gridfs.put(model_path, self.serialized_model.model_dump(by_alias=True)):
-                return "Model successfully serialized"
+                mod_count = uow.models.update_by_object_id(
+                    obj_id=self.id,
+                    update_query={
+                        "$set": {
+                            "serialized_model": self.serialized_model.model_dump(by_alias=True)
+                        }
+                    }
+                )
+                if mod_count == 1:
+                    return "Model successfully serialized"
 
 
     @not_none_return
